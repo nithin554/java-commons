@@ -1,0 +1,50 @@
+name: Maven Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '25'
+
+      - name: Maven Build
+        id: build
+        shell: bash
+        run: |
+          set -eou pipefail
+          mvn clean verify | tee maven-output.log
+
+      - name: Update Job Summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ ${{ job.status }} == 'success' ]]; then
+            echo "### ✅ Build Succeeded" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📝 Test Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f maven-output.log ] && grep -q "\[INFO\] Results:" maven-output.log; then
+            TEST_SUMMARY=$(grep 'Tests run:' maven-output.log | sed 's/\[INFO\] //g')
+            if [ -n "$TEST_SUMMARY" ]; then
+              echo "- $TEST_SUMMARY" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "No tests were run." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "No test summary found in build log." >> $GITHUB_STEP_SUMMARY
+          fi
