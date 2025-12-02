@@ -19,6 +19,10 @@ jobs:
           distribution: 'zulu'
           java-version: '25'
 
+      - name: Install Dependencies
+        shell: bash
+        run: mvn dependency:go-offline
+
       - name: Maven Build
         id: build
         shell: bash
