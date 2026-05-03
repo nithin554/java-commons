@@ -8,6 +8,9 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, macos-latest-large]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

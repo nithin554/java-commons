@@ -14,6 +14,63 @@
         <java.version>25</java.version>
     </properties>
 
+    <profiles>
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os>
+                    <family>linux</family>
+                </os>
+            </activation>
+            <properties>
+                <native.lib.path>
+                    ${project.build.directory}/nar/${project.artifactId}-${project.version}-amd64-Linux-gpp-jni/lib/amd64-Linux-gpp/jni
+                </native.lib.path>
+            </properties>
+        </profile>
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <native.lib.path>
+                    ${project.build.directory}/nar/${project.artifactId}-${project.version}-amd64-Windows-gpp-jni/lib/amd64-Windows-gpp/jni
+                </native.lib.path>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac-arm</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <native.lib.path>
+                    ${project.build.directory}/nar/${project.artifactId}-${project.version}-aarch64-MacOSX-gpp-jni/lib/aarch64-MacOSX-gpp/jni
+                </native.lib.path>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac-x86</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <native.lib.path>
+                    ${project.build.directory}/nar/${project.artifactId}-${project.version}-x86_64-MacOSX-gpp-jni/lib/x86_64-MacOSX-gpp/jni
+                </native.lib.path>
+            </properties>
+        </profile>
+    </profiles>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -72,21 +129,32 @@
                 <configuration>
                     <forkCount>1</forkCount>
                     <argLine>
-                        --enable-preview -javaagent:${project.basedir}/target/commons-java-1.0.0.jar
+                        -javaagent:${project.basedir}/target/${project.artifactId}-${project.version}.jar
+                        -Djava.library.path=${native.lib.path}
                     </argLine>
                 </configuration>
             </plugin>
-            <!-- This plugin compiles the project and needs preview features enabled -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
-                <configuration>
-                    <release>${java.version}</release>
-                    <compilerArgs>
-                        <arg>--enable-preview</arg>
-                    </compilerArgs>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>process-sources</phase>   <!-- ← earlier than compile -->
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <release>${java.version}</release>
+                            <compilerArgs>
+                                <!-- Output headers to target/generated-sources/jni so C code can include them -->
+                                <arg>-h</arg>
+                                <arg>${project.build.directory}/generated-sources/jni</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>net.revelc.code.formatter</groupId>
@@ -119,6 +187,99 @@
                                     <version>25</version>
                                 </requireJavaVersion>
                             </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Compile C and produce native lib -->
+            <plugin>
+                <groupId>com.github.maven-nar</groupId>
+                <artifactId>nar-maven-plugin</artifactId>
+                <version>3.10.1</version>
+                <extensions>true</extensions>
+                <executions>
+                    <!-- Validate AOL (arch/OS/linker) -->
+                    <execution>
+                        <id>nar-validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>nar-validate</goal>
+                        </goals>
+                    </execution>
+                    <!-- Download any NAR dependencies -->
+                    <execution>
+                        <id>nar-download</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>nar-download</goal>
+                        </goals>
+                    </execution>
+                    <!-- Unpack NAR dependencies -->
+                    <execution>
+                        <id>nar-unpack</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>nar-unpack</goal>
+                        </goals>
+                    </execution>
+                    <!-- Set up system includes -->
+                    <execution>
+                        <id>nar-system-generate</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>nar-system-generate</goal>
+                        </goals>
+                    </execution>
+                    <!-- Compile the C code -->
+                    <execution>
+                        <id>nar-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>nar-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <c>
+                        <sourceDirectory>src/main/c</sourceDirectory>
+                        <includePaths>
+                            <includePath>${project.build.directory}/generated-sources/jni</includePath>
+                        </includePaths>
+                    </c>
+                    <java>
+                        <include>true</include>
+                    </java>
+                    <libraries>
+                        <library>
+                            <type>jni</type>
+                        </library>
+                    </libraries>
+                </configuration>
+            </plugin>
+            <!-- Copy .so/.dll into jar under natives/ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-natives</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/natives</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}/nar</directory>
+                                    <includes>
+                                        <include>**/*.so</include>
+                                        <include>**/*.dll</include>
+                                        <include>**/*.dylib</include>
+                                    </includes>
+                                </resource>
+                            </resources>
                         </configuration>
                     </execution>
                 </executions>
