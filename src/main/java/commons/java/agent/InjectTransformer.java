@@ -45,9 +45,9 @@ public class InjectTransformer implements ClassFileTransformer {
    * methodName=&ltinit&gt, methodDescriptor=()V
    */
   private static final BiPredicate<ClassModel, CodeElement> isASuperCallInstruction = (transformingClassModel,
-                                                                                       codeElement) -> codeElement instanceof InvokeInstruction instr && instr.opcode() == Opcode.INVOKESPECIAL
-      && instr.name().stringValue().equals("<init>") && transformingClassModel.superclass().isPresent()
-      && instr.owner().asSymbol().equals(transformingClassModel.superclass().get().asSymbol());
+      codeElement) -> codeElement instanceof InvokeInstruction instr && instr.opcode() == Opcode.INVOKESPECIAL
+          && instr.name().stringValue().equals("<init>") && transformingClassModel.superclass().isPresent()
+          && instr.owner().asSymbol().equals(transformingClassModel.superclass().get().asSymbol());
 
   /**
    * Identifies if the class needs transformation by reading the annotations of
@@ -148,7 +148,7 @@ public class InjectTransformer implements ClassFileTransformer {
    * @return Method transformer to inject bytecode into constructor
    */
   private MethodTransform getConstructorTransformer(ClassModel transformingClassModel,
-                                                    Map<String, String> fieldNameDescriptorsMap, String transformingClassName) {
+      Map<String, String> fieldNameDescriptorsMap, String transformingClassName) {
     return MethodTransform.transformingCode((codeBuilder, codeElement) -> {
       // Proceed with original constructor instruction until we encounter a super call
       // instruction
@@ -206,7 +206,7 @@ public class InjectTransformer implements ClassFileTransformer {
    * @return Class transformer to inject bytecode into constructor
    */
   private ClassTransform getClassTransformer(ClassModel transformingClassModel,
-                                             Map<String, String> fieldNameDescriptorsMap, String transformingClassName) {
+      Map<String, String> fieldNameDescriptorsMap, String transformingClassName) {
     return (classBuilder, classElement) -> {
       // Search for constructor to start injecting bytecode which initializes beans
       if (classElement instanceof MethodModel methodModel && "<init>".equals(methodModel.methodName().stringValue())) {
@@ -221,7 +221,7 @@ public class InjectTransformer implements ClassFileTransformer {
 
   @Override
   public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
-                          ProtectionDomain protectionDomain, byte[] classFileBuffer) {
+      ProtectionDomain protectionDomain, byte[] classFileBuffer) {
     // Avoid transforming JDK classes or the agent itself
     if (className == null || className.startsWith("java/") || className.startsWith("javax/")
         || className.startsWith("sun/") || className.startsWith("commons/java/agent")) {
